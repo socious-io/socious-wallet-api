@@ -1,0 +1,6 @@
+AWS_ACCESS_KEY_ID=changeme
+AWS_SECRET_ACCESS_KEY=changeme
+AWS_DEFAULT_REGION=region
+AWS_BUCKET=bucket-name
+HTTP_ORIGIN=http://localhost:3001
+API_KEY=test
