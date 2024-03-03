@@ -3,6 +3,8 @@ import multer from 'multer';
 import multerS3 from 'multer-s3';
 import { Readable } from 'stream';
 import { config } from './config';
+import axios from 'axios';
+import crypto from 'crypto';
 
 const s3 = new S3Client(config.aws);
 
@@ -45,3 +47,48 @@ const streamToBuffer = (stream: Readable): Promise<Buffer> => {
     });
   });
 };
+
+export async function sendCredentials({ connectionId, claims }: { connectionId: string; claims: any }) {
+  const payload = {
+    claims,
+    connectionId,
+    issuingDID: config.wallet.trust_did,
+    schemaId: null,
+    automaticIssuance: true,
+  };
+  const res = await axios.post(`${config.agent}/prism-agent/issue-credentials/credential-offers`, payload);
+  return res.data;
+}
+
+export async function createConnection() {
+  const { data } = await axios.post(`${config.agent}/prism-agent/connections`, { label: 'Wallet Verify Connection' });
+  const id = data.connectionId;
+  let url = data.invitation.invitationUrl;
+  url = url.replace('https://my.domain.com/path', config.wallet.connect_address);
+  return { id, url };
+}
+
+export async function getVerifyStatus(session: string) {
+  const url = `${config.kyc.endpoint}/v1/sessions/${session}/decision`;
+  const headers = {
+    'X-AUTH-CLIENT': config.kyc.apikey,
+    'X-HMAC-SIGNATURE': generateSignature(session),
+  };
+  const response = await axios.get(url, { headers });
+  return response.data;
+}
+
+export function generateSignature(payload: any) {
+  const secret = config.kyc.secret;
+  if (payload.constructor === Object) {
+    payload = JSON.stringify(payload);
+  }
+
+  if (payload.constructor !== Buffer) {
+    payload = Buffer.from(payload, 'utf8');
+  }
+
+  const signature = crypto.createHmac('sha256', secret);
+  signature.update(payload);
+  return signature.digest('hex');
+}

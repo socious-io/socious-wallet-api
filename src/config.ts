@@ -14,4 +14,16 @@ export const config = {
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY as string,
     },
   },
+  kyc: {
+    endpoint: process.env.KYC_API_ENDPOINT as string,
+    apikey: process.env.KYC_API_KEY as string,
+    secret: process.env.KYC_API_SECRET_KEY as string,
+  },
+  agent: {
+    endpoint: process.env.AGENT_ENDPOINT as string,
+  },
+  wallet: {
+    connect_address: 'https://wallet.socious.io/connect',
+    trust_did: (process.env.AGENT_ENDPOINT as string) || '',
+  },
 };
