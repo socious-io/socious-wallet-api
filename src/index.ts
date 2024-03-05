@@ -5,7 +5,7 @@ import { config } from './config';
 
 const app = express();
 app.use(express.json());
-app.use(cors({ origin: config.http.origin }));
+app.use(cors());
 
 const kyc: Record<string, string> = {};
 const connections: Record<string, string> = {};
