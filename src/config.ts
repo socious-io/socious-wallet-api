@@ -21,9 +21,10 @@ export const config = {
   },
   agent: {
     endpoint: process.env.AGENT_ENDPOINT as string,
+    trust_did: process.env.AGENT_TRUST_DID as string,
   },
   wallet: {
     connect_address: 'https://wallet.socious.io/connect',
-    trust_did: (process.env.AGENT_ENDPOINT as string) || '',
+    callback: (process.env.WALLET_CALLBACK_URL as string) || 'https://wallet-api.socious.io/verify/claims',
   },
 };

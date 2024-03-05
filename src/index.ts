@@ -10,21 +10,21 @@ app.use(cors({ origin: config.http.origin }));
 const kyc: Record<string, string> = {};
 const connections: Record<string, string> = {};
 
-app.use((req: Request, res: Response, next: NextFunction) => {
+const apiKeyRequired = (req: Request, res: Response, next: NextFunction) => {
   const apiKey = req.headers['x-api-key'];
   if (config.apikey && apiKey !== config.apikey) {
     return res.status(403).json({ message: 'Invalid API key' });
   }
   next();
-});
+};
 
-app.post('/sync', upload.single('file'), (req: Request, res: Response) => {
+app.post('/sync', apiKeyRequired, upload.single('file'), (req: Request, res: Response) => {
   res.send({
     message: 'File uploaded successfully.',
   });
 });
 
-app.get('/fetch/:did', async (req: Request, res: Response) => {
+app.get('/fetch/:did', apiKeyRequired, async (req: Request, res: Response) => {
   const { did } = req.params;
   try {
     const buffer = await fetch(did);
@@ -43,7 +43,7 @@ app.get('/fetch/:did', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/verify/start', (req: Request, res: Response) => {
+app.post('/verify/start', apiKeyRequired, (req: Request, res: Response) => {
   const { did, session } = req.body;
   if (did && session) kyc[did] = session;
   res.send({
@@ -51,17 +51,19 @@ app.post('/verify/start', (req: Request, res: Response) => {
   });
 });
 
-app.get('/verify/:did/status', async (req: Request, res: Response) => {
+app.get('/verify/:did/status', apiKeyRequired, async (req: Request, res: Response) => {
   const { did } = req.params;
   const connection: any = {};
   const session = kyc[did];
+  if (!session) return res.status(400).json({ message: 'Verffication session could not be found' });
+
   const { data } = await getVerifyStatus(session);
 
   if (data.verification?.status === 'approved') {
     const { id, url } = await createConnection();
     connection.id = id;
     connection.url = url;
-    connections[did] = id;
+    connections[id] = did;
   }
 
   res.send({
@@ -70,15 +72,38 @@ app.get('/verify/:did/status', async (req: Request, res: Response) => {
   });
 });
 
-app.get('/verify/:did/claim', async (req: Request, res: Response) => {
-  const { did } = req.params;
-  const connectionId = connections[did];
+app.get('/verify/claims/:id', async (req: Request, res: Response) => {
+  const accepted = req.query.accept === 'true' ? true : false;
+  const { id } = req.params;
+
+  if (!accepted) return res.send({ message: 'not accepted' });
+
+  const did = connections[id];
+  const session = kyc[did];
+  const { data } = await getVerifyStatus(session);
+
+  if (data.verification?.status !== 'approved') {
+    return res.status(403).json({ message: 'Verffication is not valid' });
+  }
+
+  const v = data.verification;
+
   const claims = {
-    type: 'verify',
-    data: 'test verify VC',
+    type: 'verification',
+    first_name: v.person.firstName,
+    last_name: v.person.lastName,
+    gender: v.person.gender,
+    id_number: v.person.idNumber,
+    date_of_birth: v.person.dateOfBirth,
+    country: v.document.country,
+    document_type: v.document.type,
+    document_number: v.document.number,
+    verified_at: v.acceptanceTime,
   };
 
-  res.send(await sendCredentials({ connectionId, claims }));
+  await sendCredentials({ connectionId: id, claims });
+
+  res.send({ message: 'success' });
 });
 
 app.listen(config.http.port, () => {
