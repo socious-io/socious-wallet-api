@@ -72,18 +72,13 @@ export async function createConnection() {
 }
 
 export async function getVerifyStatus(session: string) {
-  try {
-    const url = `${config.kyc.endpoint}/v1/sessions/${session}/decision/fullauto?version=1.0.0`;
-    const headers = {
-      'X-AUTH-CLIENT': config.kyc.apikey,
-      'X-HMAC-SIGNATURE': generateSignature(session),
-    };
-    return axios.get(url, { headers });
-  } catch (err) {
-    console.log(err);
-    await timeout(1000);
-    return getVerifyStatus(session);
-  }
+  const url = `${config.kyc.endpoint}/v1/sessions/${session}/decision/fullauto?version=1.0.0`;
+  const headers = {
+    'X-AUTH-CLIENT': config.kyc.apikey,
+    'X-HMAC-SIGNATURE': generateSignature(session),
+  };
+
+  return axios.get(url, { headers });
 }
 
 export function generateSignature(payload: any) {

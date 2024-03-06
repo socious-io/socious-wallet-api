@@ -57,17 +57,28 @@ app.get('/verify/:did/status', apiKeyRequired, async (req: Request, res: Respons
   const session = kyc[did];
   if (!session) return res.status(400).json({ message: 'Verffication session could not be found' });
 
-  const { data } = await getVerifyStatus(session);
-  if (data.verification?.status === 'approved') {
-    const { id, url } = await createConnection();
-    connection.id = id;
-    connection.url = url;
-    connections[id] = did;
+  try {
+    const { data } = await getVerifyStatus(session);
+
+    if (data.decision === 'approved') {
+      const { id, url } = await createConnection();
+      connection.id = id;
+      connection.url = url;
+      connections[id] = did;
+    }
+
+    res.send({
+      verification: { status: data.decision },
+      connection,
+    });
+
+  } catch (err) {
+    console.log(err)
+    res.send({
+      verification: null,
+      connection: null,
+    });
   }
-  res.send({
-    verification: data.verification,
-    connection,
-  });
 });
 
 app.get('/verify/claims/:id', async (req: Request, res: Response) => {
@@ -78,29 +89,29 @@ app.get('/verify/claims/:id', async (req: Request, res: Response) => {
 
   const did = connections[id];
   const session = kyc[did];
-  const { data } = await getVerifyStatus(session);
-  if (data.verification?.status !== 'approved') {
-    return res.status(403).json({ message: 'Verffication is not valid' });
+  try {
+    const { data } = await getVerifyStatus(session);
+    if (data.decision !== 'approved') {
+      return res.status(403).json({ message: 'Verffication is not valid' });
+    }
+
+    const claims = {
+      type: 'verification',
+      first_name: data.person.firstName?.value,
+      last_name: data.person.lastName?.value,
+      gender: data.person.gender?.value,
+      id_number: data.person.idNumber?.value,
+      date_of_birth: data.person.dateOfBirth?.value,
+      country: data.document.country?.value,
+      document_type: data.document.type?.value,
+      document_number: data.document.number?.value,
+    };
+
+    await sendCredentials({ connectionId: id, claims });
+    res.send({ message: 'success' });
+  } catch (err) {
+    return res.send({ message: 'decision not maked yet' });
   }
-
-  const v = data.verification;
-
-  const claims = {
-    type: 'verification',
-    first_name: v.person.firstName?.value,
-    last_name: v.person.lastName?.value,
-    gender: v.person.gender?.value,
-    id_number: v.person.idNumber?.value,
-    date_of_birth: v.person.dateOfBirth?.value,
-    country: v.document.country?.value,
-    document_type: v.document.type?.value,
-    document_number: v.document.number?.value,
-    verified_at: v.acceptanceTime,
-  };
-
-  await sendCredentials({ connectionId: id, claims });
-
-  res.send({ message: 'success' });
 });
 
 app.listen(config.http.port, () => {
