@@ -58,14 +58,12 @@ app.get('/verify/:did/status', apiKeyRequired, async (req: Request, res: Respons
   if (!session) return res.status(400).json({ message: 'Verffication session could not be found' });
 
   const { data } = await getVerifyStatus(session);
-
   if (data.verification?.status === 'approved') {
     const { id, url } = await createConnection();
     connection.id = id;
     connection.url = url;
     connections[id] = did;
   }
-
   res.send({
     verification: data.verification,
     connection,
@@ -81,7 +79,6 @@ app.get('/verify/claims/:id', async (req: Request, res: Response) => {
   const did = connections[id];
   const session = kyc[did];
   const { data } = await getVerifyStatus(session);
-
   if (data.verification?.status !== 'approved') {
     return res.status(403).json({ message: 'Verffication is not valid' });
   }
@@ -90,14 +87,14 @@ app.get('/verify/claims/:id', async (req: Request, res: Response) => {
 
   const claims = {
     type: 'verification',
-    first_name: v.person.firstName,
-    last_name: v.person.lastName,
-    gender: v.person.gender,
-    id_number: v.person.idNumber,
-    date_of_birth: v.person.dateOfBirth,
-    country: v.document.country,
-    document_type: v.document.type,
-    document_number: v.document.number,
+    first_name: v.person.firstName?.value,
+    last_name: v.person.lastName?.value,
+    gender: v.person.gender?.value,
+    id_number: v.person.idNumber?.value,
+    date_of_birth: v.person.dateOfBirth?.value,
+    country: v.document.country?.value,
+    document_type: v.document.type?.value,
+    document_number: v.document.number?.value,
     verified_at: v.acceptanceTime,
   };
 

@@ -73,7 +73,7 @@ export async function createConnection() {
 
 export async function getVerifyStatus(session: string) {
   try {
-    const url = `${config.kyc.endpoint}/v1/sessions/${session}/decision`;
+    const url = `${config.kyc.endpoint}/v1/sessions/${session}/decision/fullauto?version=1.0.0`;
     const headers = {
       'X-AUTH-CLIENT': config.kyc.apikey,
       'X-HMAC-SIGNATURE': generateSignature(session),
