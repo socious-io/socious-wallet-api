@@ -110,6 +110,7 @@ app.get('/verify/claims/:id', async (req: Request, res: Response) => {
     await sendCredentials({ connectionId: id, claims });
     res.send({ message: 'success' });
   } catch (err) {
+    console.log(err)
     return res.send({ message: 'decision not maked yet' });
   }
 });
