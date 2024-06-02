@@ -21,6 +21,10 @@ export const upload = multer({
   }),
 });
 
+const cloudAgentHeaders = {
+  apikey: config.agent.agent_api_key,
+};
+
 export const fetch = async (filename: string): Promise<Buffer> => {
   const command = new GetObjectCommand({
     Bucket: config.bucket,
@@ -56,14 +60,20 @@ export async function sendCredentials({ connectionId, claims }: { connectionId: 
     schemaId: null,
     automaticIssuance: true,
   };
-  const res = await axios.post(`${config.agent.endpoint}/prism-agent/issue-credentials/credential-offers`, payload);
+  const res = await axios.post(`${config.agent.endpoint}/cloud-agent/issue-credentials/credential-offers`, payload, {
+    headers: cloudAgentHeaders,
+  });
   return res.data;
 }
 
 export async function createConnection() {
-  const { data } = await axios.post(`${config.agent.endpoint}/prism-agent/connections`, {
-    label: 'Wallet Verify Connection',
-  });
+  const { data } = await axios.post(
+    `${config.agent.endpoint}/cloud-agent/connections`,
+    {
+      label: 'Wallet Verify Connection',
+    },
+    { headers: cloudAgentHeaders },
+  );
   const id = data.connectionId;
   let url = data.invitation.invitationUrl;
   url = url.replace('https://my.domain.com/path', config.wallet.connect_address);

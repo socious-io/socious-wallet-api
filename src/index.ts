@@ -71,9 +71,8 @@ app.get('/verify/:did/status', apiKeyRequired, async (req: Request, res: Respons
       verification: { status: data.decision },
       connection,
     });
-
   } catch (err) {
-    console.log(err)
+    console.log(err);
     res.send({
       verification: null,
       connection: null,
@@ -105,6 +104,7 @@ app.get('/verify/claims/:id', async (req: Request, res: Response) => {
       country: data.document.country?.value,
       document_type: data.document.type?.value,
       document_number: data.document.number?.value,
+      issued_date: new Date().toISOString(),
     };
 
     await sendCredentials({ connectionId: id, claims });

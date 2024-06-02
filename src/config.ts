@@ -22,6 +22,7 @@ export const config = {
   agent: {
     endpoint: process.env.AGENT_ENDPOINT as string,
     trust_did: process.env.AGENT_TRUST_DID as string,
+    agent_api_key: process.env.AGENT_API_KEY as string,
   },
   wallet: {
     connect_address: 'https://wallet.socious.io/connect',
