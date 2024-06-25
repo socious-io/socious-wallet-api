@@ -81,6 +81,13 @@ export async function createConnection() {
   return { id, url };
 }
 
+export async function getConnection(id: string) {
+  const { data } = await axios.get(`${config.agent.endpoint}/cloud-agent/connections/${id}`, {
+    headers: cloudAgentHeaders,
+  });
+  return data;
+}
+
 export async function getVerifyStatus(session: string) {
   const url = `${config.kyc.endpoint}/v1/sessions/${session}/decision/fullauto?version=1.0.0`;
   const headers = {
