@@ -82,7 +82,7 @@ export async function createConnection() {
 }
 
 export async function getConnection(id: string) {
-  const { data } = await axios.get(`${config.agent.endpoint}/cloud-agent/connections/${id}`, {
+  const { data } = await axios.get(`${config.agent.endpoint}/cloud-agent/connections/${id}?t=${new Date().getTime()}`, {
     headers: cloudAgentHeaders,
   });
   return data;
