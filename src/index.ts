@@ -6,9 +6,24 @@ import { config } from './config';
 const app = express();
 app.use(express.json());
 app.use(cors());
+app.use(express.json({ limit: '10mb' }));  // Adjust the limit as needed
+app.use(express.urlencoded({ limit: '10mb', extended: true }));  // For form submissions
+
 
 const kyc: Record<string, string> = {};
 const connections: Record<string, string> = {};
+
+const loggerMiddleware = (req: Request, res: Response, next: NextFunction) => {
+  const { method, url } = req;
+  const start = Date.now();
+
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`${method} ${url} - ${res.statusCode} - ${duration}ms`);
+  });
+
+  next();
+};
 
 const apiKeyRequired = (req: Request, res: Response, next: NextFunction) => {
   const apiKey = req.headers['x-api-key'];
@@ -17,6 +32,12 @@ const apiKeyRequired = (req: Request, res: Response, next: NextFunction) => {
   }
   next();
 };
+
+app.use(loggerMiddleware)
+
+app.get('/ping', (req: Request, res: Response) => {
+  res.send({'message': 'pong'})
+})
 
 app.post('/sync', apiKeyRequired, upload.single('file'), (req: Request, res: Response) => {
   res.send({
@@ -120,6 +141,8 @@ app.get('/connections/:id', async (req: Request, res: Response) => {
   res.send(conn);
 });
 
-app.listen(config.http.port, () => {
+const server = app.listen(config.http.port, () => {
   console.log(`Server is running at http://localhost:${config.http.port}`);
 });
+
+server.setTimeout(5 * 60 * 1000); 

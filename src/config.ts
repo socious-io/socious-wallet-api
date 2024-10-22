@@ -9,6 +9,9 @@ export const config = {
   bucket: process.env.AWS_BUCKET,
   aws: {
     region: process.env.AWS_DEFAULT_REGION as string,
+    httpOptions: {
+      timeout: 5 * 60 * 1000, // 5 minutes timeout for S3 operations
+    },
     credentials: {
       accessKeyId: process.env.AWS_ACCESS_KEY_ID as string,
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY as string,

@@ -19,6 +19,7 @@ export const upload = multer({
       cb(null, file.originalname);
     },
   }),
+  limits: { fileSize: 10 * 1024 * 1024 }
 });
 
 const cloudAgentHeaders = {
