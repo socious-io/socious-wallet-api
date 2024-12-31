@@ -8,6 +8,11 @@ import crypto from 'crypto';
 
 const s3 = new S3Client(config.aws);
 
+const diditToken = {
+  access_token: undefined,
+  expire_at: new Date(),
+};
+
 export const upload = multer({
   storage: multerS3({
     s3,
@@ -116,4 +121,75 @@ export function generateSignature(payload: any) {
 
 function timeout(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+
+async function getDiditToken() {
+  const url = 'https://apx.didit.me/auth/v2/token/';
+  const encodedCredentials = Buffer.from(
+    `${config.kyc.apikey}:${config.kyc.secret}`,
+  ).toString('base64');
+  
+  const params = new URLSearchParams();
+  params.append('grant_type', 'client_credentials');
+ 
+  try {
+    const response = await axios.post(url, params, {
+      headers: {
+        Authorization: `Basic ${encodedCredentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+ 
+    return response.data;
+ 
+  } catch (error) {
+    console.error('Network error:', error);
+    return null;
+  }
+};
+
+
+export async function createDiditSession(did: string) {
+  const now = new Date();
+  
+  if (!diditToken.access_token || diditToken.expire_at <= now) {
+    const res = await getDiditToken();
+    diditToken.access_token = res.access_token;
+    diditToken.expire_at = new Date(now.getTime() + res.expires_in * 1000);
+  }
+
+  const url = `${config.kyc.endpoint}/v1/session/`;
+  const body = {
+    callback: `${config.kyc.callback}`,
+    vendor_data: did,
+  };
+
+  const response = await axios.post(url, body, { headers: {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${diditToken.access_token}`,
+  }});
+  if (response.status != 201) {
+    throw Error(`could not create session res ${JSON.stringify(response.data)}`);
+  }
+
+  return response.data;
+}
+
+export async function fetchDiditSession(sessionId: string) {
+  const now = new Date();
+  
+  if (!diditToken.access_token || diditToken.expire_at <= now) {
+    const res = await getDiditToken();
+    diditToken.access_token = res.access_token;
+    diditToken.expire_at = new Date(now.getTime() + res.expires_in * 1000);
+  }
+
+  const url = `${config.kyc.endpoint}/v1/session/${sessionId}/decision/?t=${now.getTime()}`;
+  const response = await axios.get(url, { headers: {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${diditToken.access_token}`,
+  }});
+
+  return response.data
 }

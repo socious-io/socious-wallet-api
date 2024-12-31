@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { upload, fetch, getVerifyStatus, createConnection, sendCredentials, getConnection } from './utils';
+import { upload, fetch, getVerifyStatus, createConnection, sendCredentials, getConnection,  createDiditSession, fetchDiditSession } from './utils';
 import cors from 'cors';
 import { config } from './config';
 
@@ -64,13 +64,28 @@ app.get('/fetch/:did', apiKeyRequired, async (req: Request, res: Response) => {
   }
 });
 
-app.post('/verify/start', apiKeyRequired, (req: Request, res: Response) => {
+app.post('/verify/start', apiKeyRequired, async (req: Request, res: Response) => {
   const { did, session } = req.body;
-  if (did && session) kyc[did] = session;
-  res.send({
-    message: 'KYC start',
-  });
+  const response = {
+    message: 'success',
+    url: undefined,
+    session: session,
+  }
+
+  if (did && session) {
+    const { session_url } = await fetchDiditSession(session);
+    response.url = session_url;    
+  } else {
+    const { url, session_id } = await createDiditSession(did);    
+    response.url = url;
+    response.session = session_id;
+  }
+
+  kyc[did] = response.session;
+
+  res.send(response);
 });
+
 
 app.get('/verify/:did/status', apiKeyRequired, async (req: Request, res: Response) => {
   const { did } = req.params;
@@ -79,9 +94,9 @@ app.get('/verify/:did/status', apiKeyRequired, async (req: Request, res: Respons
   if (!session) return res.status(400).json({ message: 'Verffication session could not be found' });
 
   try {
-    const { data } = await getVerifyStatus(session);
+    const data = await fetchDiditSession(session);
 
-    if (data.decision === 'approved') {
+    if (data.status.toLowerCase() === 'approved') {
       const { id, url } = await createConnection();
       connection.id = id;
       connection.url = url;
@@ -89,7 +104,7 @@ app.get('/verify/:did/status', apiKeyRequired, async (req: Request, res: Respons
     }
 
     res.send({
-      verification: { status: data.decision },
+      verification: { status: data.status },
       connection,
     });
   } catch (err) {
@@ -110,21 +125,21 @@ app.get('/verify/claims/:id', async (req: Request, res: Response) => {
   const did = connections[id];
   const session = kyc[did];
   try {
-    const { data } = await getVerifyStatus(session);
-    if (data.decision !== 'approved') {
+    const data  = await fetchDiditSession(session);
+    if (data.status.toLowerCase() !== 'approved') {
       return res.status(403).json({ message: 'Verffication is not valid' });
     }
 
     const claims = {
       type: 'verification',
-      first_name: data.person.firstName?.value,
-      last_name: data.person.lastName?.value,
-      gender: data.person.gender?.value,
-      id_number: data.person.idNumber?.value,
-      date_of_birth: data.person.dateOfBirth?.value,
-      country: data.document.country?.value,
-      document_type: data.document.type?.value,
-      document_number: data.document.number?.value,
+      first_name: data.kyc.first_name,
+      last_name: data.kyc.last_name,
+      gender: data.kyc.gender,
+      id_number: data.kyc.document_number,
+      date_of_birth: data.kyc.date_of_birth,
+      country: data.kyc.issuing_state_name,
+      document_type: data.kyc.document_type,
+      document_number: data.kyc.document_number,
       issued_date: new Date().toISOString(),
     };
 
