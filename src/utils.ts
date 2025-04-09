@@ -1,6 +1,6 @@
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { Storage } from '@google-cloud/storage';
 import multer from 'multer';
-import multerS3 from 'multer-s3';
 import { Readable } from 'stream';
 import { config } from './config';
 import axios from 'axios';
@@ -8,22 +8,36 @@ import crypto from 'crypto';
 
 const s3 = new S3Client(config.aws);
 
+const gcp = new Storage({
+  keyFilename: config.gcs.credntialsFile
+})
+
+const bucket = gcp.bucket(config.gcs.bucket);
+
 const diditToken = {
   access_token: undefined,
   expire_at: new Date(),
 };
 
 export const upload = multer({
-  storage: multerS3({
-    s3,
-    bucket: config.bucket as string,
-    metadata: function (req, file, cb) {
-      cb(null, { fieldName: file.fieldname });
+  storage: {
+    _handleFile: (req, file, cb) => {
+      const blob = bucket.file(file.originalname);
+      const blobStream = blob.createWriteStream();
+
+      file.stream.pipe(blobStream)
+        .on('error', (err) => cb(err))
+        .on('finish', () => {
+          cb(null, {
+            path: `https://storage.googleapis.com/${bucket.name}/${blob.name}`,
+            filename: blob.name
+          });
+        });
     },
-    key: function (req, file, cb) {
-      cb(null, file.originalname);
-    },
-  }),
+    _removeFile: (req, file, cb) => {
+      bucket.file(file.filename).delete().then(() => cb(null)).catch(cb);
+    }
+  },
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 

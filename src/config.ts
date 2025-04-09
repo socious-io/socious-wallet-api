@@ -32,4 +32,10 @@ export const config = {
     connect_address: 'https://wallet.socious.io/connect',
     callback: (process.env.WALLET_CALLBACK_URL as string) || 'https://wallet-api.socious.io/verify/claims',
   },
+
+  gcs: {
+    credntialsFile: process.env.GCS_CREDENTIALS_FILE as string,
+    bucket: process.env.GCS_BUCKET as string
+  }
+
 };
