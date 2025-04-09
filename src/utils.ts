@@ -1,4 +1,3 @@
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { Storage } from '@google-cloud/storage';
 import multer from 'multer';
 import { Readable } from 'stream';
@@ -6,7 +5,6 @@ import { config } from './config';
 import axios from 'axios';
 import crypto from 'crypto';
 
-const s3 = new S3Client(config.aws);
 
 const gcp = new Storage({
   keyFilename: config.gcs.credntialsFile
