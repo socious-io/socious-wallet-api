@@ -44,17 +44,14 @@ const cloudAgentHeaders = {
 };
 
 export const fetch = async (filename: string): Promise<Buffer> => {
-  const command = new GetObjectCommand({
-    Bucket: config.bucket,
-    Key: filename,
-  });
-  const { Body } = await s3.send(command);
-
-  if (Body instanceof Readable) {
-    // Convert the stream to a Buffer
-    return await streamToBuffer(Body);
-  } else {
-    throw new Error('Expected a stream for S3 object body.');
+  const file = bucket.file(filename);
+  
+  try {
+    // Download the file as a Buffer
+    const [buffer] = await file.download();
+    return buffer;
+  } catch (error) {
+    throw new Error(`Failed to fetch file from GCS: ${error}`);
   }
 };
 
