@@ -12,6 +12,7 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));  // For form sub
 
 const kyc: Record<string, string> = {};
 const connections: Record<string, string> = {};
+const approvedConnections: Record<string, { id: string; url: string }> = {};
 
 const loggerMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const { method, url } = req;
@@ -101,10 +102,13 @@ app.get('/verify/:did/status', apiKeyRequired, async (req: Request, res: Respons
     const data = await fetchDiditSession(session);
 
     if (data.status.toLowerCase() === 'approved') {
-      const { id, url } = await createConnection();
-      connection.id = id;
-      connection.url = url;
-      connections[id] = did;
+      if (!approvedConnections[did]) {
+        const { id, url } = await createConnection();
+        approvedConnections[did] = { id, url };
+        connections[id] = did;
+      }
+      connection.id = approvedConnections[did].id;
+      connection.url = approvedConnections[did].url;
     }
 
     res.send({
