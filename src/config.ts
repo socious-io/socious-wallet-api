@@ -6,16 +6,9 @@ export const config = {
     origin: process.env.HTTP_ORIGIN?.split(',') || [],
   },
   apikey: process.env.API_KEY,
-  bucket: process.env.AWS_BUCKET,
-  aws: {
-    region: process.env.AWS_DEFAULT_REGION as string,
-    httpOptions: {
-      timeout: 5 * 60 * 1000, // 5 minutes timeout for S3 operations
-    },
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID as string,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY as string,
-    },
+  gcs: {
+    bucket: process.env.GCS_BUCKET as string,
+    credentialsFile: process.env.GCS_CREDENTIALS_FILE as string,
   },
   kyc: {
     endpoint: process.env.KYC_API_ENDPOINT as string,
@@ -27,6 +20,7 @@ export const config = {
     endpoint: process.env.AGENT_ENDPOINT as string,
     trust_did: process.env.AGENT_TRUST_DID as string,
     agent_api_key: process.env.AGENT_API_KEY as string,
+    credential_schema_id: process.env.AGENT_CREDENTIAL_SCHEMA_ID || '07cfc621-0d0b-3afd-a59e-6bc23f606cb5',
   },
   wallet: {
     connect_address: 'https://wallet.socious.io/connect',

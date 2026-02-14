@@ -39,9 +39,13 @@ app.get('/ping', (req: Request, res: Response) => {
   res.send({'message': 'pong'})
 })
 
-app.post('/sync', apiKeyRequired, upload.single('file'), (req: Request, res: Response) => {
-  res.send({
-    message: 'File uploaded successfully.',
+app.post('/sync', apiKeyRequired, (req: Request, res: Response, next: NextFunction) => {
+  upload.single('file')(req, res, (err: any) => {
+    if (err) {
+      console.error('Sync upload error:', err.message);
+      return res.status(503).json({ message: 'Backup storage temporarily unavailable' });
+    }
+    res.send({ message: 'File uploaded successfully.' });
   });
 });
 

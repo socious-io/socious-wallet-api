@@ -1,70 +1,45 @@
 import { Storage } from '@google-cloud/storage';
 import multer from 'multer';
-import { Readable } from 'stream';
 import { config } from './config';
 import axios from 'axios';
 import crypto from 'crypto';
 
-
-const gcp = new Storage({
-  keyFilename: config.gcs.credntialsFile
-})
-
-const bucket = gcp.bucket(config.gcs.bucket);
+const storage = new Storage({ keyFilename: config.gcs.credentialsFile });
+const bucket = storage.bucket(config.gcs.bucket);
 
 const diditToken = {
-  access_token: undefined,
+  access_token: undefined as string | undefined,
   expire_at: new Date(),
 };
 
-export const upload = multer({
-  storage: {
-    _handleFile: (req, file, cb) => {
-      const blob = bucket.file(file.originalname);
-      const blobStream = blob.createWriteStream();
+const multerMemory = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-      file.stream.pipe(blobStream)
-        .on('error', (err) => cb(err))
-        .on('finish', () => {
-          cb(null, {
-            path: `https://storage.googleapis.com/${bucket.name}/${blob.name}`,
-            filename: blob.name
-          });
-        });
-    },
-    _removeFile: (req, file, cb) => {
-      bucket.file(file.filename).delete().then(() => cb(null)).catch(cb);
-    }
+export const upload = {
+  single: (fieldName: string) => {
+    const memUpload = multerMemory.single(fieldName);
+    return async (req: any, res: any, next: any) => {
+      memUpload(req, res, async (err: any) => {
+        if (err) return next(err);
+        if (!req.file) return next();
+        try {
+          const blob = bucket.file(req.file.originalname);
+          await blob.save(req.file.buffer, { resumable: false });
+          next();
+        } catch (uploadErr) {
+          next(uploadErr);
+        }
+      });
+    };
   },
-  limits: { fileSize: 10 * 1024 * 1024 }
-});
+};
 
 const cloudAgentHeaders = {
   apikey: config.agent.agent_api_key,
 };
 
 export const fetch = async (filename: string): Promise<Buffer> => {
-  const file = bucket.file(filename);
-  
-  try {
-    // Download the file as a Buffer
-    const [buffer] = await file.download();
-    return buffer;
-  } catch (error) {
-    throw new Error(`Failed to fetch file from GCS: ${error}`);
-  }
-};
-
-// Helper function to convert a stream to a Buffer
-const streamToBuffer = (stream: Readable): Promise<Buffer> => {
-  return new Promise((resolve, reject) => {
-    const chunks: Uint8Array[] = [];
-    stream.on('data', (chunk) => chunks.push(chunk));
-    stream.on('error', reject);
-    stream.on('end', () => {
-      resolve(Buffer.concat(chunks));
-    });
-  });
+  const [contents] = await bucket.file(filename).download();
+  return contents;
 };
 
 export async function sendCredentials({ connectionId, claims }: { connectionId: string; claims: any }) {
@@ -72,7 +47,7 @@ export async function sendCredentials({ connectionId, claims }: { connectionId: 
     claims,
     connectionId,
     issuingDID: config.agent.trust_did,
-    schemaId: null,
+    schemaId: `${config.agent.endpoint}/cloud-agent/schema-registry/schemas/${config.agent.credential_schema_id}`,
     automaticIssuance: true,
   };
   const res = await axios.post(`${config.agent.endpoint}/cloud-agent/issue-credentials/credential-offers`, payload, {
@@ -138,10 +113,10 @@ async function getDiditToken() {
   const encodedCredentials = Buffer.from(
     `${config.kyc.apikey}:${config.kyc.secret}`,
   ).toString('base64');
-  
+
   const params = new URLSearchParams();
   params.append('grant_type', 'client_credentials');
- 
+
   try {
     const response = await axios.post(url, params, {
       headers: {
@@ -149,9 +124,9 @@ async function getDiditToken() {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
     });
- 
+
     return response.data;
- 
+
   } catch (error) {
     console.error('Network error:', error);
     return null;
@@ -161,7 +136,7 @@ async function getDiditToken() {
 
 export async function createDiditSession(did: string) {
   const now = new Date();
-  
+
   if (!diditToken.access_token || diditToken.expire_at <= now) {
     const res = await getDiditToken();
     diditToken.access_token = res.access_token;
@@ -187,7 +162,7 @@ export async function createDiditSession(did: string) {
 
 export async function fetchDiditSession(sessionId: string) {
   const now = new Date();
-  
+
   if (!diditToken.access_token || diditToken.expire_at <= now) {
     const res = await getDiditToken();
     diditToken.access_token = res.access_token;
