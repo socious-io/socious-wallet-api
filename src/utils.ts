@@ -113,10 +113,10 @@ async function getDiditToken() {
   const encodedCredentials = Buffer.from(
     `${config.kyc.apikey}:${config.kyc.secret}`,
   ).toString('base64');
-  
+
   const params = new URLSearchParams();
   params.append('grant_type', 'client_credentials');
- 
+
   try {
     const response = await axios.post(url, params, {
       headers: {
@@ -124,9 +124,9 @@ async function getDiditToken() {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
     });
- 
+
     return response.data;
- 
+
   } catch (error) {
     console.error('Network error:', error);
     return null;
@@ -136,7 +136,7 @@ async function getDiditToken() {
 
 export async function createDiditSession(did: string) {
   const now = new Date();
-  
+
   if (!diditToken.access_token || diditToken.expire_at <= now) {
     const res = await getDiditToken();
     diditToken.access_token = res.access_token;
@@ -162,7 +162,7 @@ export async function createDiditSession(did: string) {
 
 export async function fetchDiditSession(sessionId: string) {
   const now = new Date();
-  
+
   if (!diditToken.access_token || diditToken.expire_at <= now) {
     const res = await getDiditToken();
     diditToken.access_token = res.access_token;
