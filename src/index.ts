@@ -95,7 +95,12 @@ app.post('/verify/start', apiKeyRequired, async (req: Request, res: Response) =>
 app.get('/verify/:did/status', apiKeyRequired, async (req: Request, res: Response) => {
   const { did } = req.params;
   const connection: any = {};
-  const session = kyc[did];
+  let session = kyc[did];
+  // Self-heal after server restart: accept session from query param
+  if (!session && req.query.session) {
+    session = req.query.session as string;
+    kyc[did] = session;
+  }
   if (!session) return res.status(400).json({ message: 'Verffication session could not be found' });
 
   try {
