@@ -1,61 +1,45 @@
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { Storage } from '@google-cloud/storage';
 import multer from 'multer';
-import multerS3 from 'multer-s3';
-import { Readable } from 'stream';
 import { config } from './config';
 import axios from 'axios';
 import crypto from 'crypto';
 
-const s3 = new S3Client(config.aws);
+const storage = new Storage({ keyFilename: config.gcs.credentialsFile });
+const bucket = storage.bucket(config.gcs.bucket);
 
 const diditToken = {
-  access_token: undefined,
+  access_token: undefined as string | undefined,
   expire_at: new Date(),
 };
 
-export const upload = multer({
-  storage: multerS3({
-    s3,
-    bucket: config.bucket as string,
-    metadata: function (req, file, cb) {
-      cb(null, { fieldName: file.fieldname });
-    },
-    key: function (req, file, cb) {
-      cb(null, file.originalname);
-    },
-  }),
-  limits: { fileSize: 10 * 1024 * 1024 }
-});
+const multerMemory = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+export const upload = {
+  single: (fieldName: string) => {
+    const memUpload = multerMemory.single(fieldName);
+    return async (req: any, res: any, next: any) => {
+      memUpload(req, res, async (err: any) => {
+        if (err) return next(err);
+        if (!req.file) return next();
+        try {
+          const blob = bucket.file(req.file.originalname);
+          await blob.save(req.file.buffer, { resumable: false });
+          next();
+        } catch (uploadErr) {
+          next(uploadErr);
+        }
+      });
+    };
+  },
+};
 
 const cloudAgentHeaders = {
   apikey: config.agent.agent_api_key,
 };
 
 export const fetch = async (filename: string): Promise<Buffer> => {
-  const command = new GetObjectCommand({
-    Bucket: config.bucket,
-    Key: filename,
-  });
-  const { Body } = await s3.send(command);
-
-  if (Body instanceof Readable) {
-    // Convert the stream to a Buffer
-    return await streamToBuffer(Body);
-  } else {
-    throw new Error('Expected a stream for S3 object body.');
-  }
-};
-
-// Helper function to convert a stream to a Buffer
-const streamToBuffer = (stream: Readable): Promise<Buffer> => {
-  return new Promise((resolve, reject) => {
-    const chunks: Uint8Array[] = [];
-    stream.on('data', (chunk) => chunks.push(chunk));
-    stream.on('error', reject);
-    stream.on('end', () => {
-      resolve(Buffer.concat(chunks));
-    });
-  });
+  const [contents] = await bucket.file(filename).download();
+  return contents;
 };
 
 export async function sendCredentials({ connectionId, claims }: { connectionId: string; claims: any }) {
@@ -63,7 +47,7 @@ export async function sendCredentials({ connectionId, claims }: { connectionId: 
     claims,
     connectionId,
     issuingDID: config.agent.trust_did,
-    schemaId: null,
+    schemaId: `${config.agent.endpoint}/cloud-agent/schema-registry/schemas/${config.agent.credential_schema_id}`,
     automaticIssuance: true,
   };
   const res = await axios.post(`${config.agent.endpoint}/cloud-agent/issue-credentials/credential-offers`, payload, {
