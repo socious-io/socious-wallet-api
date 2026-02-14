@@ -107,13 +107,17 @@ app.get('/verify/:did/status', apiKeyRequired, async (req: Request, res: Respons
     const data = await fetchDiditSession(session);
 
     if (data.status.toLowerCase() === 'approved') {
-      if (!approvedConnections[did]) {
-        const { id, url } = await createConnection();
-        approvedConnections[did] = { id, url };
-        connections[id] = did;
+      try {
+        if (!approvedConnections[did]) {
+          const { id, url } = await createConnection();
+          approvedConnections[did] = { id, url };
+          connections[id] = did;
+        }
+        connection.id = approvedConnections[did].id;
+        connection.url = approvedConnections[did].url;
+      } catch (connErr) {
+        console.error('Failed to create connection:', connErr);
       }
-      connection.id = approvedConnections[did].id;
-      connection.url = approvedConnections[did].url;
     }
 
     res.send({
