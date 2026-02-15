@@ -14,7 +14,7 @@ export const config = {
     endpoint: process.env.KYC_API_ENDPOINT as string,
     apikey: process.env.KYC_API_KEY as string,
     secret: process.env.KYC_API_SECRET_KEY as string,
-    callback: process.env.KYC_API_CALLBACK_URL as string || 'https://wallet.socious.io/verify',
+    callback: process.env.KYC_API_CALLBACK_URL as string || 'https://wallet-api.socious.io/verify/complete',
   },
   agent: {
     endpoint: process.env.AGENT_ENDPOINT as string,

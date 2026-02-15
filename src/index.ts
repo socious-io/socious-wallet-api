@@ -168,6 +168,25 @@ app.get('/verify/claims/:id', async (req: Request, res: Response) => {
   }
 });
 
+// DIDIT redirects here after verification; serves page that bounces back to the native app
+app.get('/verify/complete', (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/html');
+  res.send(`<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Verification Complete</title>
+<style>body{font-family:-apple-system,sans-serif;display:flex;align-items:center;
+justify-content:center;min-height:100vh;margin:0;background:#f5f5f5;text-align:center}
+.c{padding:32px}.btn{display:inline-block;margin-top:24px;padding:14px 32px;
+background:#6366f1;color:#fff;border-radius:12px;text-decoration:none;font-size:17px}</style>
+</head><body><div class="c">
+<h2>Verification Complete</h2>
+<p>Redirecting back to Socious Wallet&hellip;</p>
+<a class="btn" href="sociouswallet://verify-complete">Return to Wallet</a>
+</div>
+<script>setTimeout(function(){window.location.href="sociouswallet://verify-complete"},600)</script>
+</body></html>`);
+});
+
 app.get('/connections/:id', async (req: Request, res: Response) => {
   const conn = await getConnection(req.params.id);
   res.send(conn);
