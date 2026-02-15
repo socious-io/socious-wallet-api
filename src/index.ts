@@ -71,17 +71,32 @@ app.get('/fetch/:did', apiKeyRequired, async (req: Request, res: Response) => {
 
 app.post('/verify/start', apiKeyRequired, async (req: Request, res: Response) => {
   const { did, session } = req.body;
-  const response = {
+  const response: { message: string; url: any; session: any } = {
     message: 'success',
     url: undefined,
     session: session,
   }
 
   if (did && session) {
-    const { session_url } = await fetchDiditSession(session);
-    response.url = session_url;    
+    const data = await fetchDiditSession(session);
+    console.log(`[START] Reusing session=${session} didit_status=${data.status} keys=${Object.keys(data).join(',')}`);
+    // If session already approved or has terminal status, create fresh session
+    if (['approved', 'declined', 'expired', 'abandoned'].includes(data.status?.toLowerCase())) {
+      console.log(`[START] Session ${session} has terminal status (${data.status}), creating fresh session`);
+      const { url, session_id } = await createDiditSession(did);
+      response.url = url;
+      response.session = session_id;
+    } else {
+      response.url = data.session_url;
+      // If session_url is missing from decision endpoint, try to construct it
+      if (!response.url) {
+        console.log(`[START] No session_url in decision response, constructing URL`);
+        response.url = `${config.kyc.endpoint}/session/${session}`;
+      }
+    }
   } else {
-    const { url, session_id } = await createDiditSession(did);    
+    const { url, session_id } = await createDiditSession(did);
+    console.log(`[START] Created new session=${session_id} url=${url}`);
     response.url = url;
     response.session = session_id;
   }
@@ -105,13 +120,15 @@ app.get('/verify/:did/status', apiKeyRequired, async (req: Request, res: Respons
 
   try {
     const data = await fetchDiditSession(session);
+    console.log(`[STATUS] did=${did.substring(0, 16)}... session=${session} didit_status=${data.status} has_kyc=${!!data.kyc} keys=${Object.keys(data).join(',')}`);
 
-    if (data.status.toLowerCase() === 'approved') {
+    if (data.status?.toLowerCase() === 'approved') {
       try {
         if (!approvedConnections[did]) {
           const { id, url } = await createConnection();
           approvedConnections[did] = { id, url };
           connections[id] = did;
+          console.log(`[STATUS] Connection created: id=${id}`);
         }
         connection.id = approvedConnections[did].id;
         connection.url = approvedConnections[did].url;
@@ -124,8 +141,8 @@ app.get('/verify/:did/status', apiKeyRequired, async (req: Request, res: Respons
       verification: { status: data.status },
       connection,
     });
-  } catch (err) {
-    console.log(err);
+  } catch (err: any) {
+    console.error(`[STATUS] Error fetching DIDIT session=${session}:`, err?.response?.status, err?.response?.data || err.message);
     res.send({
       verification: null,
       connection: null,
@@ -170,6 +187,7 @@ app.get('/verify/claims/:id', async (req: Request, res: Response) => {
 
 // DIDIT redirects here after verification; serves page that bounces back to the native app
 app.get('/verify/complete', (req: Request, res: Response) => {
+  console.log(`[CALLBACK] DIDIT callback: verificationSessionId=${req.query.verificationSessionId} status=${req.query.status} all_params=${JSON.stringify(req.query)}`);
   res.setHeader('Content-Type', 'text/html');
   res.send(`<!DOCTYPE html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
