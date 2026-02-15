@@ -13,6 +13,7 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));  // For form sub
 const kyc: Record<string, string> = {};
 const connections: Record<string, string> = {};
 const approvedConnections: Record<string, { id: string; url: string }> = {};
+const credentialIssued: Record<string, boolean> = {};
 
 const loggerMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const { method, url } = req;
@@ -134,7 +135,7 @@ app.get('/verify/:did/status', apiKeyRequired, async (req: Request, res: Respons
     const data = await fetchDiditSession(session);
     console.log(`[STATUS] did=${did.substring(0, 16)}... session=${session} didit_status=${data.status} has_kyc=${!!data.kyc} keys=${Object.keys(data).join(',')}`);
 
-    if (data.status?.toLowerCase() === 'approved') {
+    if (data.status?.toLowerCase() === 'approved' && !credentialIssued[did]) {
       try {
         if (!approvedConnections[did]) {
           const { id, url } = await createConnection();
@@ -190,8 +191,9 @@ app.get('/verify/claims/:id', async (req: Request, res: Response) => {
     };
 
     await sendCredentials({ connectionId: id, claims });
-    // Clear connection so status endpoint stops returning it (prevents redirect loop)
-    if (did) delete approvedConnections[did];
+    // Mark credential as issued so status endpoint stops creating new connections
+    if (did) credentialIssued[did] = true;
+    console.log(`[CLAIMS] Credential issued for did=${did?.substring(0, 16)}... connectionId=${id}`);
     res.send({ message: 'success' });
   } catch (err) {
     console.log(err);
