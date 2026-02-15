@@ -190,6 +190,8 @@ app.get('/verify/claims/:id', async (req: Request, res: Response) => {
     };
 
     await sendCredentials({ connectionId: id, claims });
+    // Clear connection so status endpoint stops returning it (prevents redirect loop)
+    if (did) delete approvedConnections[did];
     res.send({ message: 'success' });
   } catch (err) {
     console.log(err);
