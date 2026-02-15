@@ -77,22 +77,34 @@ app.post('/verify/start', apiKeyRequired, async (req: Request, res: Response) =>
     session: session,
   }
 
-  if (did && session) {
-    const data = await fetchDiditSession(session);
-    console.log(`[START] Reusing session=${session} didit_status=${data.status} keys=${Object.keys(data).join(',')}`);
-    // If session already approved or has terminal status, create fresh session
-    if (['approved', 'declined', 'expired', 'abandoned'].includes(data.status?.toLowerCase())) {
-      console.log(`[START] Session ${session} has terminal status (${data.status}), creating fresh session`);
+  // Check if server already has a session for this DID (handles double-tap)
+  const existingServerSession = kyc[did];
+  const sessionToCheck = session || existingServerSession;
+
+  if (did && sessionToCheck) {
+    try {
+      const data = await fetchDiditSession(sessionToCheck);
+      const status = data.status?.toLowerCase();
+      console.log(`[START] Checking session=${sessionToCheck} didit_status=${data.status} session_url=${data.session_url}`);
+
+      if (['approved', 'declined', 'expired', 'abandoned'].includes(status)) {
+        // Terminal status — create a fresh session
+        console.log(`[START] Session ${sessionToCheck} has terminal status (${data.status}), creating fresh session`);
+        const { url, session_id } = await createDiditSession(did);
+        response.url = url;
+        response.session = session_id;
+      } else {
+        // Session is still active (not started, in progress, in review) — reuse it
+        response.url = data.session_url;
+        response.session = sessionToCheck;
+        console.log(`[START] Reusing active session=${sessionToCheck} url=${data.session_url}`);
+      }
+    } catch (err: any) {
+      console.error(`[START] Error checking session ${sessionToCheck}:`, err?.message);
+      // Session lookup failed — create fresh
       const { url, session_id } = await createDiditSession(did);
       response.url = url;
       response.session = session_id;
-    } else {
-      response.url = data.session_url;
-      // If session_url is missing from decision endpoint, try to construct it
-      if (!response.url) {
-        console.log(`[START] No session_url in decision response, constructing URL`);
-        response.url = `${config.kyc.endpoint}/session/${session}`;
-      }
     }
   } else {
     const { url, session_id } = await createDiditSession(did);
@@ -185,9 +197,29 @@ app.get('/verify/claims/:id', async (req: Request, res: Response) => {
   }
 });
 
-// DIDIT redirects here after verification; serves page that bounces back to the native app
-app.get('/verify/complete', (req: Request, res: Response) => {
-  console.log(`[CALLBACK] DIDIT callback: verificationSessionId=${req.query.verificationSessionId} status=${req.query.status} all_params=${JSON.stringify(req.query)}`);
+// DIDIT redirects here after verification; serves page that bounces back to the native app.
+// DIDIT passes ?verificationSessionId=xxx&status=yyy as query params.
+// We use the verificationSessionId to update our kyc map so status polling uses the correct session.
+app.get('/verify/complete', async (req: Request, res: Response) => {
+  const verificationSessionId = req.query.verificationSessionId as string;
+  const status = req.query.status as string;
+  console.log(`[CALLBACK] DIDIT callback: verificationSessionId=${verificationSessionId} status=${status}`);
+
+  // Update kyc map: look up vendor_data (DID) from the DIDIT session and remap kyc[did] to this session
+  if (verificationSessionId) {
+    try {
+      const data = await fetchDiditSession(verificationSessionId);
+      const did = data.vendor_data;
+      if (did) {
+        const oldSession = kyc[did];
+        kyc[did] = verificationSessionId;
+        console.log(`[CALLBACK] Remapped kyc[${did.substring(0, 16)}...] from ${oldSession} to ${verificationSessionId} (status=${data.status})`);
+      }
+    } catch (err: any) {
+      console.error(`[CALLBACK] Failed to fetch DIDIT session ${verificationSessionId}:`, err?.message);
+    }
+  }
+
   res.setHeader('Content-Type', 'text/html');
   res.send(`<!DOCTYPE html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
