@@ -220,6 +220,7 @@ app.get('/verify/complete', async (req: Request, res: Response) => {
     }
   }
 
+  const walletWebUrl = config.wallet.connect_address.replace('/connect', '');
   res.setHeader('Content-Type', 'text/html');
   res.send(`<!DOCTYPE html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -233,13 +234,23 @@ background:#6366f1;color:#fff;border-radius:12px;text-decoration:none;font-size:
 <p>Redirecting back to Socious Wallet&hellip;</p>
 <a class="btn" href="sociouswallet://verify-complete">Return to Wallet</a>
 </div>
-<script>setTimeout(function(){window.location.href="sociouswallet://verify-complete"},600)</script>
+<script>
+var t=setTimeout(function(){window.location.href="${walletWebUrl}"},2000);
+try{window.location.href="sociouswallet://verify-complete";
+setTimeout(function(){if(!document.hidden){clearTimeout(t);window.location.href="${walletWebUrl}"}},1500)}catch(e){window.location.href="${walletWebUrl}"}
+</script>
 </body></html>`);
 });
 
 app.get('/connections/:id', async (req: Request, res: Response) => {
   const conn = await getConnection(req.params.id);
   res.send(conn);
+});
+
+app.post('/diag', (req: Request, res: Response) => {
+  const { step, data, error } = req.body;
+  console.log(`[DIAG] ${step}:`, JSON.stringify(data || error || '').substring(0, 500));
+  res.send({ ok: true });
 });
 
 const server = app.listen(config.http.port, () => {
