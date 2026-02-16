@@ -190,9 +190,9 @@ app.get('/verify/claims/:id', async (req: Request, res: Response) => {
       issued_date: new Date().toISOString(),
     };
 
-    await sendCredentials({ connectionId: id, claims });
-    // Mark credential as issued so status endpoint stops creating new connections
+    // Mark credential as pending BEFORE sending to prevent race with status polling
     if (did) credentialIssued[did] = true;
+    await sendCredentials({ connectionId: id, claims });
     console.log(`[CLAIMS] Credential issued for did=${did?.substring(0, 16)}... connectionId=${id}`);
     res.send({ message: 'success' });
   } catch (err) {
