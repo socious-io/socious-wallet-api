@@ -6,9 +6,12 @@ export const config = {
     origin: process.env.HTTP_ORIGIN?.split(',') || [],
   },
   apikey: process.env.API_KEY,
-  gcs: {
-    bucket: process.env.GCS_BUCKET as string,
-    credentialsFile: process.env.GCS_CREDENTIALS_FILE as string,
+  s3: {
+    bucket: process.env.S3_BUCKET as string,
+    endpoint: process.env.S3_ENDPOINT as string,
+    region: process.env.S3_REGION || 'us-ashburn-1',
+    accessKeyId: process.env.S3_ACCESS_KEY_ID as string,
+    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY as string,
   },
   kyc: {
     endpoint: process.env.KYC_API_ENDPOINT as string,

@@ -1,11 +1,18 @@
-import { Storage } from '@google-cloud/storage';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import multer from 'multer';
 import { config } from './config';
 import axios from 'axios';
 import crypto from 'crypto';
 
-const storage = new Storage({ keyFilename: config.gcs.credentialsFile });
-const bucket = storage.bucket(config.gcs.bucket);
+const s3 = new S3Client({
+  region: config.s3.region,
+  endpoint: config.s3.endpoint,
+  credentials: {
+    accessKeyId: config.s3.accessKeyId,
+    secretAccessKey: config.s3.secretAccessKey,
+  },
+  forcePathStyle: true,
+});
 
 const diditToken = {
   access_token: undefined as string | undefined,
@@ -22,8 +29,11 @@ export const upload = {
         if (err) return next(err);
         if (!req.file) return next();
         try {
-          const blob = bucket.file(req.file.originalname);
-          await blob.save(req.file.buffer, { resumable: false });
+          await s3.send(new PutObjectCommand({
+            Bucket: config.s3.bucket,
+            Key: req.file.originalname,
+            Body: req.file.buffer,
+          }));
           next();
         } catch (uploadErr) {
           next(uploadErr);
@@ -38,8 +48,12 @@ const cloudAgentHeaders = {
 };
 
 export const fetch = async (filename: string): Promise<Buffer> => {
-  const [contents] = await bucket.file(filename).download();
-  return contents;
+  const response = await s3.send(new GetObjectCommand({
+    Bucket: config.s3.bucket,
+    Key: filename,
+  }));
+  const bytes = await response.Body!.transformToByteArray();
+  return Buffer.from(bytes);
 };
 
 export async function sendCredentials({ connectionId, claims }: { connectionId: string; claims: any }) {
